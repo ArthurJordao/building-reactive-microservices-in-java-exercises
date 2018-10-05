@@ -1,12 +1,14 @@
 package io.vertx.book.http;
 
-import io.vertx.core.AbstractVerticle;
+import io.vertx.rxjava.core.AbstractVerticle;
 import io.vertx.core.json.JsonObject;
-import io.vertx.ext.web.Router;
-import io.vertx.ext.web.RoutingContext;
-import io.vertx.ext.web.client.HttpRequest;
-import io.vertx.ext.web.client.WebClient;
-import io.vertx.ext.web.codec.BodyCodec;
+import io.vertx.rxjava.ext.web.Router;
+import io.vertx.rxjava.ext.web.RoutingContext;
+import io.vertx.rxjava.ext.web.client.HttpRequest;
+import io.vertx.rxjava.ext.web.client.HttpResponse;
+import io.vertx.rxjava.ext.web.client.WebClient;
+import io.vertx.rxjava.ext.web.codec.BodyCodec;
+import rx.Single;
 
 public class HelloConsumerMicroservice extends AbstractVerticle {
 
@@ -18,24 +20,31 @@ public class HelloConsumerMicroservice extends AbstractVerticle {
 
         Router router = Router.router(vertx);
 
-        router.get("/").handler(this::invokeMyFistMicrosservice);
+        router.get("/").handler(this::invokeMyFistMicroservice);
 
         vertx.createHttpServer()
                 .requestHandler(router::accept)
                 .listen(8081);
     }
 
-    private void invokeMyFistMicrosservice(RoutingContext rc) {
-        HttpRequest<JsonObject> request = client.get(8080, "localhost", "/vert.x")
+    private void invokeMyFistMicroservice(RoutingContext rc) {
+        HttpRequest<JsonObject> request1 = client.get(8080, "localhost", "/Luke")
+                .as(BodyCodec.jsonObject());
+        HttpRequest<JsonObject> request2 = client.get(8080, "localhost", "/Leia")
                 .as(BodyCodec.jsonObject());
 
-        request.send(ar -> {
-            if (ar.failed()) {
-                rc.fail(ar.cause());
-            } else {
-                rc.response().end(ar.result().body().encode());
-            }
-        });
+        Single<JsonObject> s1 = request1.rxSend().map(HttpResponse::body);
+        Single<JsonObject> s2 = request2.rxSend().map(HttpResponse::body);
+
+        Single.zip(s1, s2, (luke, leia) ->
+                new JsonObject()
+                        .put("Luke", luke.getString("message"))
+                        .put("Leia", leia.getString("message")))
+                .subscribe(result -> rc.response().end(result.encode()),
+                        error -> {
+                            error.printStackTrace();
+                            rc.response().setStatusCode(500).end(error.getMessage());
+                        });
     }
 
 }
