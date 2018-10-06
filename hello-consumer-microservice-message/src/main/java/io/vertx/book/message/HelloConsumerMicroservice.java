@@ -24,12 +24,16 @@ public class HelloConsumerMicroservice extends AbstractVerticle {
 
             Single.zip(obs1, obs2, (luke, leia) ->
                     new JsonObject()
-                            .put("Luke", luke.getString("message"))
-                            .put("Leia", leia.getString("message")))
+                            .put("Luke", luke.getString("message")
+                                    + " from "
+                                    + luke.getString("served-by"))
+                            .put("Leia", leia.getString("message")
+                                    + " from "
+                                    + leia.getString("served-by")))
                     .subscribe(x -> req.response().end(x.encode()),
                             e-> req.response().setStatusCode(500).end(e.getMessage()));
         })
-        .listen(8082);
+                .listen(8082);
     }
 
 }
